@@ -57,10 +57,9 @@ work. For example, Windows users will probably want to use `gmake` instead of
 
 # Authors
 
-B<Fredrik Vold> C<E<lt>fredrik@webkonsept.comE<gt>> - Original (0.1.x) author.
+ - **Fredrik Vold** <fredrik@webkonsept.com> - Original (0.1.x) author.
 
-B<Ryan Thompson> C<E<lt>rjt@cpan.orgE<gt>> - 1.x+ maintainer. Fragmentation
-support, unit test suite, miscellaneous fixes and cleanup.
+ - **Ryan Thompson** <rjt@cpan.org> - 1.x+ maintainer. Fragmentation support, unit test suite, miscellaneous fixes and cleanup.
 
 # License (Fredrik)
 
