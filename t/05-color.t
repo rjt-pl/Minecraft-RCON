@@ -33,7 +33,7 @@ my %modes = (
     ["\x{00a7}3Two \x{00a7}4colors" => 'Two colors'                         ],
   ],
   convert => [
-    ["Plain string"                 => "Plain string\e[0m"                  ],
+    ["Plain string"                 => "Plain string"                       ],
     ["Color \x{00a7}4middle"        => "Color \e[31mmiddle\e[0m"            ],
     ["\x{00a7}fColor start"         => "\e[97mColor start\e[0m"             ],
     ["Color end\x{00a7}5"           => "Color end\e[35m\e[0m"               ],
