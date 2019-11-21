@@ -1,395 +1,500 @@
-#  Minecraft::RCON
+# Minecraft::RCON - RCON remote console for Minecraft
 #
-# Written by Fredrik Vold, no copyrights, no rights reserved.
+# 1.x and above by Ryan Thompson <rjt@cpan.org>
+#
+# Original (0.1.x) by Fredrik Vold, no copyrights, no rights reserved.
 # This is absolutely free software, and you can do with it as you please.
 # If you do derive your own work from it, however, it'd be nice with some
 # credits to me somewhere in the comments of that work.
-
+#
+# Based on http:://wiki.vg/RCON documentation
 
 package Minecraft::RCON;
 
-require 5.006;  # To be honest, I don't know this to be true, but AT LEAST this version!
-                # If you're still at 5.006 and this won't run, the solution is TO UPGRADE PERL.
+our $VERSION = '1.010_01';
 
+use 5.008;
 use strict;
 use warnings;
-use IO::Socket 1.18; # Autoflush default on PLX
-use Data::Dumper;
-use Carp;
-use Term::ANSIColor 3.02;
+no warnings 'uninitialized';
 
-our $VERSION = '0.1.4';
+use Term::ANSIColor  3.02;
+use IO::Socket       1.18;  # autoflush
+use Carp;
 
 use constant {
-    PASSWORD => 3,
-    COMMAND => 2,
+    # Packet types
+    AUTH            =>  3,  # Minecraft RCON login packet type
+    AUTH_RESPONSE   =>  2,  # Server auth response
+    AUTH_FAIL       => -1,  # Auth failure (password invalid)
+    COMMAND         =>  2,  # Command packet type
+    RESPONSE_VALUE  =>  0,  # Server response
 };
 
-my %COLOR = (
-    0 => color('black'),
-    1 => color('blue'),
-    2 => color('green'),
-    3 => color('cyan'),
-    4 => color('red'),
-    5 => color('magenta'),
-    6 => color('yellow'),
-    7 => color('white'),
-    8 => color('bright_black'),
-    9 => color('bright_blue'),
-    a => color('bright_green'),
-    b => color('bright_cyan'),
-    c => color('bright_red'),
-    d => color('bright_magenta'),
-    e => color('yellow'),
-    f => color('bright_white'),
-
-    l => color('bold'),
-    m => color('concealed'),
-    n => color('underline'),
-    o => color('reverse'),
-
-    r => color('reset'),
+# Minecraft -> ANSI color map
+my %COLOR = map { $_->[1] => color($_->[0]) } (
+    [black        => '0'], [blue           => '1'], [green        => '2'],
+    [cyan         => '3'], [red            => '4'], [magenta      => '5'],
+    [yellow       => '6'], [white          => '7'], [bright_black => '8'],
+    [bright_blue  => '9'], [bright_green   => 'a'], [bright_cyan  => 'b'],
+    [bright_red   => 'c'], [bright_magenta => 'd'], [yellow       => 'e'],
+    [bright_white => 'f'],
+    [bold         => 'l'], [concealed      => 'm'], [underline    => 'n'],
+    [reverse      => 'o'], [reset          => 'r'],
 );
 
-return 509; # For Kevin
+# Defaults for new objects. Override in constructor or with accessors.
+sub _DEFAULTS(%) {
+    (
+        address       => '127.0.0.1',
+        port          => 25575,
+        password      => '',
+        color_mode    => 'strip',
+        request_id    => 0,
+
+        # DEPRECATED options
+        strip_color   => undef,
+        convert_color => undef,
+
+        @_, # Subclasses may override
+    );
+}
+
+# DEPRECATED warning text for convenience/consistency
+my $DEP = 'deprecated and will be removed in a future release.';
 
 sub new {
-    my ($class,$conf) = @_;
-    my $self = $conf;
-    $self->{'request_count'} = 0;
-    bless $self,$class;
-    return $self;
+    my $class = shift;
+    my %opts = 'HASH' eq ref $_[0] ? %{$_[0]} : @_;
+    my %DEFAULTS = _DEFAULTS();
+
+    # DEPRECATED -- Warn and transition to new option
+    if ($opts{convert_color}) {
+        carp "convert_color $DEP\nConverted to color_mode => 'convert'.";
+        $opts{color_mode} = 'convert';
+    }
+    if ($opts{strip_color}) {
+        carp "strip_color $DEP\nConverted to color_mode => 'strip'.";
+        $opts{color_mode} = 'strip';
+    }
+
+    my @unknowns = grep { not exists $DEFAULTS{$_} } sort keys %opts;
+    carp "Ignoring unknown option(s): " . join(', ', @unknowns) if @unknowns;
+
+    bless { %DEFAULTS, %opts }, $class;
 }
 
-sub strip_color {
-    my ($self,$strip) = @_;
-    if (defined $strip){
-        $self->{'strip_color'} = $strip;
-    }
-    if (!defined $self->{'strip_color'}){
-        return 1;
-    }
-    else {
-        return $self->{'strip_color'};
-    }
+sub connect {
+    my ($s) = @_;
+
+    return 1 if $s->connected;
+
+    croak 'Password required' unless length $s->{password};
+
+    $s->{socket} = IO::Socket::INET->new(
+        PeerAddr => $s->{address},
+        PeerPort => $s->{port},
+        Proto    => 'tcp',
+    ) or croak "Connection to $s->{address}:$s->{port} failed: .$!";
+
+    my $id = $s->_next_id;
+    $s->_send_encode(AUTH, $id, $s->{password});
+    my ($size,$res_id,$type,$payload) = $s->_recv_decode;
+
+    # Force a reconnect if we're about to error out
+    $s->disconnect unless $type == AUTH_RESPONSE and $id == $res_id;
+
+    croak 'RCON authentication failed'           if $res_id == AUTH_FAIL;
+    croak "Expected AUTH_RESPONSE(2), got $type" if   $type != AUTH_RESPONSE;
+    croak "Expected ID $id, got $res_id"         if     $id != $res_id;
+    croak "Non-blank payload <$payload>"         if  length $payload;
+
+    return 1;
 }
-sub convert_color {
-    my ($self,$convert) = @_;
-    if (defined $convert){
-        $self->{'convert_color'} = $convert;
-    }
-    if (!defined $self->{'convert_color'}){
-        return 1;
-    }
-    else {
-        return $self->{'convert_color'};
-    }
-}
-sub address {
-    my ($self,$address) = @_;
-    if (defined $address){
-        $self->{'address'} = $address;
-    }
-    return $self->{'address'} || '127.0.0.1';
-}
-sub port {
-    my ($self,$port) = @_;
-    if (defined $port){
-        $self->{'port'} = $port;
-    }
-    return $self->{'port'} || 25575;
-}
-sub password {
-    my ($self,$password) = @_;
-    if (defined $password){
-        if ($password eq ''){
-            carp "Attempt to set empty password";
-        }
-        else {
-            $self->{'password'} = $password;
-        }
-    }
-    return $self->{'password'} || '';
+
+sub connected { $_[0]->{socket} and $_[0]->{socket}->connected }
+
+sub disconnect {
+    $_[0]->{socket}->shutdown(2) if $_[0]->connected;
+    delete $_[0]->{socket} if exists $_[0]->{socket};
+    1;
 }
 
 sub command {
-    my ($self,$payload) = @_;
-    my $socket = $self->{'socket'};
-    if (!defined $socket){
-        carp "Sending commands to a closed socket";
-        return undef;
-    }
-    else {
-        print $socket $self->_encode_packet(COMMAND,$payload);
-        my ($size,$id,$type,$payload) = $self->_get_packet;
-        return $payload;
-    }
-}
-sub disconnect {
-    my ($self) = @_;
-    if (my $socket = $self->{'socket'}){
-        close $socket;
-        $self->{'socket'} = undef;
-    }
-}
-sub connect {
-    my ($self) = @_;
-    if ($self->{'socket'}){
-        carp "Trying to connect while already connected";
-        return 0;
-    }
-    if ($self->password eq ''){
-        carp "Attempt to connect without specifying password";
-        return 0;
-    }
-    my $socket = IO::Socket::INET->new (
-        PeerAddr => $self->address,
-        PeerPort => $self->port,
-        Proto    => 'tcp',
-    );
+    my ($s, $command, $mode) = @_;
 
-    if (!$socket){
-        carp 'Connection to '.$self->address.':'.$self->port.' failed.';
-        return 0;
+    # Return undef explicitly here because 0 might be a legit command result
+    croak 'Command required' unless length $command;
+    croak 'Not connected'    unless $s->connected;
+
+    my $id = $s->_next_id;
+    my $nonce = 16 + int rand(1 << 15 - 16); # Avoid 0..15
+    $s->_send_encode(COMMAND, $id, $command);
+    $s->_send_encode($nonce,  $id, 'nonce');
+
+    my $res = '';
+    while (1) {
+        my ($size,$res_id,$type,$payload) = $s->_recv_decode;
+        if ($id != $res_id) {
+            $s->disconnect;
+            croak sprintf(
+                "Desync. Expected %d (0x%4x), got %d (0x%4x). Disconnected.",
+                $id, $id, $res_id, $res_id
+            );
+        }
+        croak "size:$size id:$id got type $type, not RESPONSE_VALUE(0)"
+            if $type != RESPONSE_VALUE;
+        last if $payload eq sprintf 'Unknown request %x', $nonce;
+        $res .= $payload;
     }
 
-    print $socket $self->_packet_password;
-    my ($size,$id,$type,$payload) = $self->_get_packet($socket);
-    my $expected = $self->_expected_request_id;
-    if ($type != 2){
-        carp "Unknown RCON auth failure, wrong packet type ($type, expected 2) returned.";
-        close($socket);
-        return 0;
-    }
-    elsif (!defined $id || $id != $expected){
-        carp "RCON password is WRONG!";
-        close($socket);
-        return 0;
-    }
-    else {
-        $self->{'socket'} = $socket;
-        return 1;
+    $s->color_convert($res, defined $mode ? $mode : $s->{color_mode});
+}
+
+sub color_mode {
+    my ($s, $mode, $code) = @_;
+    return $s->{color_mode} if not defined $mode;
+    croak 'Invalid color mode.'
+        unless $mode =~ /^(strip|convert|ignore)$/;
+
+    if ($code) {
+        my $was = $s->{color_mode};
+        $s->{color_mode} = $mode;
+        $code->();
+        $s->{color_mode} = $was;
+    } else {
+        $s->{color_mode} = $mode;
     }
 }
 
-sub _encode_packet {
-    my ($self,$type,$payload) = @_;
+sub color_convert {
+    my ($s, $text, $mode) = @_;
+    $mode = $s->{color_mode} if not defined $mode;
+    my $re = qr/\x{00A7}(.)/o;
+
+    $text =~ s/$re//g           if $mode eq 'strip';
+    $text =~ s/$re/$COLOR{$1}/g if $mode eq 'convert';
+    $text .= $COLOR{r}          if $mode eq 'convert' and $text =~ /\e\[/;
+
+    $text;
+}
+
+sub DESTROY { $_[0]->disconnect }
+
+#
+# DEPRECATED methods
+#
+
+sub convert_color {
+    my ($s, $val) = @_;
+    carp "convert_color() is $DEP\nUse color_mode('convert') instead";
+    $s->color_mode('convert') if $val;
+
+    $s->color_mode eq 'convert';
+}
+
+sub strip_color {
+    my ($s, $val) = @_;
+    carp "strip_color() is $DEP\nUse color_mode('strip') instead";
+    $s->color_mode('strip') if $val;
+
+    $s->color_mode eq 'strip';
+}
+
+sub address {
+    carp "address() is $DEP";
+    $_[0]->{address} = $_[1] if defined $_[1];
+    $_[0]->{address};
+}
+
+sub port {
+    carp "port() is $DEP";
+    $_[0]->{port} = $_[1] if defined $_[1];
+    $_[0]->{port};
+}
+
+sub password {
+    carp "password() is $DEP";
+    $_[0]->{password} = $_[1] if defined $_[1];
+    $_[0]->{password};
+}
+
+#
+# Private helpers
+#
+
+# Increment and return the next request ID, wrapping at 2**31-1
+sub _next_id { $_[0]->{request_id} = ($_[0]->{request_id} + 1) % 2**31 }
+
+# Form and send a packet of the specified type, request_id and payload
+sub _send_encode {
+    my ($s, $type, $id, $payload) = @_;
+    confess "Request ID `$id' is not an integer" unless $id =~ /^\d+$/;
     $payload = "" unless defined $payload;
-    my $id = ++$self->{'request_count'};
-    my $data = pack("II",$id,$type);
-    $data   .= $payload."\0\0";
-    $data    = pack("I",length($data)).$data;
-    return $data;
-}
-sub _decode_packet {
-    my ($self,$raw_packet) = @_;
-    if (length($raw_packet) >= 12){ # Check if the packet is viable before trying to decode it.
-        my $size = unpack("I",substr $raw_packet,0,4);
-        my $id   = unpack("I",substr $raw_packet,4,4);
-        my $type = unpack("I",substr $raw_packet,8,4);
-        my $payload = substr $raw_packet,12,$size;
+    my $data = pack('V!V' => $id, $type) . $payload . "\0\0";
+    $s->{socket}->send(pack(V => length $data) . $data);
 
-        if ($payload !~ s/\0\0$//){ # A proper Minecraft packet ends in two null characters.
-            carp('Recieved packet might be incomplete');
-        }
-
-        # strip and convert are mutually exclusive, strip takes presidence
-        if ($self->strip_color){
-            $payload =~ s/\x{00A7}.//g;
-        }
-        elsif ($self->convert_color){
-            $payload =~ s/\x{00A7}(.)/$COLOR{$1}/g;
-            $payload .= $COLOR{'r'};
-        }
-        return ($size,$id,$type,$payload);
-    }
-    else {
-        carp('Non-viable packet recieved.  Packet is length '.length($raw_packet));
-        return (undef,undef,undef);
-    }
-}
-sub _packet_password {
-    my ($self) = @_;
-    return $self->_encode_packet(PASSWORD,$self->{'password'});
-}
-sub _get_packet {
-    my ($self,$socket) = @_;
-    if (!defined $socket){
-        $socket = $self->{'socket'};
-    }
-
-    my $data;
-    if ($socket){
-        recv($socket,$data,32767,0); # Assuming Java max signed short integer, since we're talking to Minecraft
-        return ($self->_decode_packet($data));
-    }
-    else {
-        carp "Attempt at getting a packet from a closed socket";
-        return (undef,undef,undef);
-    }
-}
-sub _expected_request_id {
-    my ($self) = @_;
-    return $self->{'request_count'};
 }
 
-sub DESTROY {
-    my ($self) = @_;
-    if (my $socket = $self->{'socket'}){
-        close $socket;
+# Grab a single packet.
+sub _recv_decode {
+    my ($s) = @_;
+    confess "_recv_decode when not connected" unless $s->connected;
+
+    local $_; $s->{socket}->recv($_, 4);
+    my $size = unpack 'V';
+    $_ = '';
+    my $frags = 0;
+
+    croak "Zero length packet" unless $size;
+
+    while ($size > length) {
+        my $buf;
+        $s->{socket}->recv($buf, $size);
+        $_ .= $buf;
+        $frags++;
     }
+
+    croak 'Packet too short. ' . length . ' < 10' if 10 > length;
+    croak "Received packet missing terminator" unless s/\0\0$//;
+
+    $size, unpack 'V!V(A*)';
 }
 
 1;
-
 
 __END__
 
 =head1 NAME
 
-Minecraft::RCON - Handles talking to the Minecraft remote console
+Minecraft::RCON - RCON remote console communication with Minecraft servers
+
+=head1 VERSION
+
+Version 1.010_01
 
 =head1 SYNOPSIS
 
-
     use Minecraft::RCON;
 
-    my $rcon = Minecraft::RCON->new( { password => 'f4ble' } );
-    if ($rcon->connect){
-        print $rcon->command('help');
-    }
-    else {
-        print "Oh dang, connection failed!\n";
-        # Error capturing and fetching is in the works...
-    }
+    my $rcon = Minecraft::RCON->new( { password => 'secret' } );
+
+    eval { $rcon->connect };
+    die "Connection failed: $@" if $@;
+
+    my $response;
+    eval { $response = $rcon->command('help') };
+    say $@ ? "Error: $@" : "Response: $response";
+
     $rcon->disconnect;
 
 =head1 DESCRIPTION
 
-
-C<Minecraft::RCON> provides a nice object interface for talking to 
-Mojang AB's game Minecraft.  Intended for use with their multiplayer
-servers, specifically I<your> multiplayer server, as you will need
-the correct rcon.password, and rcon must be enabled on said server.
+C<Minecraft::RCON> provides a nice object interface for talking to Mojang AB's
+game Minecraft. Intended for use with their multiplayer servers, specifically
+I<your> multiplayer server, as you will need the correct RCON password, and
+RCON must be enabled on said server.
 
 =head1 CONSTRUCTOR
 
+=head2 new( %options )
 
-=over 4
-
-=item new ( [HASHREF] )
-
-A hashref containing all used keys with their default value:
+Create a new RCON object. Note we do not connect automatically; see
+C<connect()> for that. The properties and their defaults are shown below:
 
     my $rcon = Minecraft::RCON->new({
         address         => '127.0.0.1',
         port            => 25575,
-        password        => ''
-        strip_color     => 1,
-        convert_color   => 1,
+        password        => '',
+        color_mode      => 'strip',
+        error_mode      => 'error',
     });
 
-=over 2
+We will C<carp()> but not die in the event that any unknown options are
+provided.
 
-=item 
-    I<address> and I<port> should explain themselves.  Defaults to localhost and the default Minecraft RCON port.  
+=over 4
 
-=item 
-    I<password> defaults to blank, which is never valid.  
+=item address
 
-=item
-    I<strip_color> makes the response to ->command have its Minecraft color codes stripped out.  
+The hostname or IP address to connect to.
 
-=item 
-    I<convert_color> tries to convert the Minecraft colors to terminal colors using L<Term::ANSIColor>.  
+=item port
 
-=back 
+The TCP port number to connect to.
 
-Note that no conversion attempt is made while stripping is enabled.  
-In addition to the constructor, the different options can be set or changed using the methods below.
+=item password
+
+The plaintext password used to authenticate. This password must match the
+C<rcon.password=> line in the F<server.properties> file for your server.
+
+=item color_mode
+
+The color mode controls how C<Minecraft::RCON> handles color codes sent back
+by the Minecraft server. It must be one of C<strip>, C<convert>, or C<ignore>.
+constants. See C<color_mode()> for more information.
 
 =back
 
 =head1 METHODS
 
+=head2 connect
 
-These are the public methods.  There are others, but any method not listed here is subject to change without any kind of notice.
+    eval { $rcon->connect }; # $@ will be set on error
 
-=over 4
+Attempt to connect to the configured address and port, and issue the
+configured password for authentication.
 
+If already connected, returns C<undef> (nothing to be done).
 
-=item address([STRING])
+This method will C<croak> if the connection fails for any reason.
+Otherwise, returns a true value.
 
-The string is the new setting, and can be omitted if you don't want to change it.
-Returns the address used to connect.
+=head2 connected
 
-Note that changing this during an ongoing connection does nothing until you ->disconnect and ->connect again.
+    say "We are connected!" if $rcon->connected;
 
+Returns true if we have a connected socket, false otherwise. Note that we have
+no way to tell if there is a misbehaving Minecraft server on the other
+side of that socket, so it is entirely possible for this command (or
+C<connect()>) to succeed, but C<command()> calls to fail.
 
-=item port([INTEGER])
+=head2 disconnect
 
-The integer is the new setting, and can be omitted if you don't want to change it.
-Returns the port used to connect.
+    $rcon->disconnect;
 
-Note that changing this during an ongoing connection does nothing until you ->disconnect and ->connect again.
+Disconnects from the server by closing the socket. Always succeeds.
 
+=head2 command( $command, [ $color_mode ] )
 
-=item password([STRING])
+    my $response = $rcon->command("data get block $x $y $z");
+    my $ansi = $rcon->command('list', 'convert');
 
-The string is the new setting, and can be omitted if you don't want to change it.
-Returns the password used to connect.
+Sends the C<$command> to the Minecraft server, and synchronously waits for the
+response. This method is capable of handling fragmented responses (spread over
+several response packets), and will concatenate them all before returning the
+result.
 
-Note that changing this during an ongoing connection does nothing until you disconnect and connect again.
+The resulting server response will have its color codes stripped, converted,
+or ignored, according to the current C<color_mode()> setting, unless a
+C<$color_mode> is given, which will override the current setting for this
+command only.
 
-If the password is wrong, it will be carped about when you attempt to connect.
+=head2 color_mode( $color_mode, [ $code ] )
 
-=item connect
+    $rcon->color_mode('strip');
 
-Attempt to connect to the configured address and port, and issue the configured password for authentication.
-Returns 1 on success, 0 otherwise.
+When a command response is received, the color codes it contains can be
+stripped, converted to ANSI, or left alone, depending on this setting.
 
-If the password is wrong, it will also carp that fact.
+C<$color_mode> is optional, unless C<$code> is also specified.
+The valid modes are as follows:
 
-=item command([STRING])
+=over 10
 
-Issues the string as a command to the Minecraft server.
+=item strip
 
-Returns the server's response, with the color codes optionally stripped or converted.
+Strip any color codes, returning the plaintext.
 
-=item disconnect
+=item convert
 
-Disconnects from the server by closing the socket.
+Convert any color codes to the equivalent ANSI escape sequences, suitable for
+display in a terminal.
 
-=item convert_color([BOOLEAN])
+=item ignore
 
-The boolean is the new setting, and can be omitted if you don't want to change it.
-Returns the current color conversion setting.
-
-As per usual in perl, blank strings, 0 and undef are considered FALSE, while pretty much anything else is TRUE.
-  
-This takes effect immediately, and does not require a reconnect.
-
-Color conversion does I<not> happen unless stripping is disabled.  I mean... what colors would it convert?  Turn both off if you want to do the conversion yourself, or have other uses for the data.
-
-=item strip_color([BOOLEAN])
-
-The boolean is the new setting, and can be omitted if you don't want to change it.
-Returns the current color stripping setting.
-
-As per usual in perl, blank strings, 0 and undef are considered FALSE, while pretty much anything else is TRUE.
-    
-This takes effect immediately, and does not require a reconnect.
-
-Note that unless you've turned on color conversions this might cause command returns to contain color codes, which is pretty much just junk data unless you intend to do the conversion yourself.
+Ignore color codes, returning the full command response verbatim.
 
 =back
 
+The current mode will be returned.
+
+If C<$code> is specified and is a C<CODE> ref, C<color_mode()> will apply the
+new color mode, run C<$code-E<gt>()>, and then restore the original color
+mode. This is useful when you use one color mode most of the time, but have
+sections of code requiring a different mode:
+
+Example usage:
+
+    # Color mode is 'convert'
+    $rcon->color_mode(strip => sub {
+        my $plaintext = $rcon->command('...');
+    });
+
+But see also C<command($cmd, $mode)> for running single commands with
+another color mode.
+
+
+=head2 color_convert( $string, [ $color_mode ] )
+
+    my $response = $rcon->command('list');
+    my ($strip, $ansi) = map { $rcon->color_convert($response, $_) }
+        qw<strip convert>;
+
+This method is used internally by C<command()> to convert command responses as
+configured in the object. However, C<color_convert()> itself may be useful in
+some applications where a stripped version of the response may be needed for
+parsing, while an ANSI version may be desired for display to a terminal, for
+example, without having to run the command itself (with possible side-effects)
+a second time. For C<color_convert()> to do anything meaningful, your object's
+C<color_mode> should be set to C<ignore>.
+
+=head1 ERROR HANDLING
+
+This module C<croak>s (see L<Carp>) for almost all errors.
+When an error does not affect control flow, we will C<carp> instead.
+
+Thus, C<command()> and C<connect()>, at minimum, should be wrapped in block
+C<eval>:
+
+    eval { $result = $rcon->command('list'); };
+    warn "I don't know who is online because: $@" if $@;
+
+If a little extra syntactic sugar is desired, you can use an exception handler
+like L<Try::Tiny> instead:
+
+    use Try::Tiny;
+
+    try {
+        $result = $rcon->command('list');
+    } catch {
+        warn "I don't know who is online because: $_";
+    }
+
+=head1 DEPRECATED METHODS
+
+The following methods have been deprecated. They will issue a warning to
+STDOUT when called, and will be removed in a future release.
+
+=head2 convert_color ( $enable )
+
+If C<$enable> is a true value, change the color mode to C<convert>.
+Returns 1 if the current color mode is C<convert>, undef otherwise.
+
+B<Deprecated.> Use C<color_mode('convert')> instead.
+
+=head2 strip_color
+
+If C<$enable> is a true value, change the color mode to C<strip>.
+Returns 1 if the current color mode is C<strip>, undef otherwise.
+
+B<Deprecated.> Use C<color_mode('strip')> instead.
+
 =head1 SEE ALSO
 
-L<Terminal::ANSIColor>, L<IO::Socket::INET>, L<Carp>
+=over 4
+
+=item L<Terminal::ANSIColor>, L<IO::Socket::INET>
+
+=item L<https://developer.valvesoftware.com/wiki/Source_RCON_Protocol>
+
+=item L<https://wiki.vg/RCON>
+
+=back
 
 =head1 AFFILIATION WITH MOJANG
 
+I<Note from original author, Fredrik Vold:>
 
 I am in no way affiliated with Mojang or the development of Minecraft.
 I'm simply a fan of their work, and a server admin myself.  I needed
@@ -399,25 +504,30 @@ It is important that everyone using this module understands that if
 Mojang changes the way RCON works, I won't be notified any sooner than
 anyone else, and I have no special avenue of connection with them.
 
-=head1 AUTHOR
+=head1 AUTHORS
 
-Fredrik Vold <fredrik@webkonsept.com>
+=over 4
 
-=head1 THANKS
+=item B<Ryan Thompson> C<E<lt>rjt@cpan.orgE<gt>>
 
-Thanks to Mojang for such a great game.
+Addition of unit test suite, fragmentation support, and other improvements.
 
-Thanks to #perl on Freenode for being great and assisting me in so many ways.
+This program is free software; you can redistribute it
+and/or modify it under the same terms as Perl itself.
 
-Of course, thanks to Larry for Perl!
+L<http://dev.perl.org/licenses/artistic.html>
 
-=head1 COPYRIGHT
+=item B<Fredrik Vold> C<E<lt>fredrik@webkonsept.comE<gt>>
 
-Minecraft is a trademark of Mojang AB.
-Name used in accordance with my interpretation of L<http://www.minecraft.net/terms>, but someone correct me if I'm wrong.  I have no affiliation with Mojang (other than being a customer and fan).
+Original (0.1.x) author.
 
 No copyright claimed, no rights reserved.
 
-You are absolutely free to do as you wish with this code, but mentioning me in your comments or whatever would be nice.
+You are absolutely free to do as you wish with this code, but mentioning me in
+your comments or whatever would be nice.
 
-=cut
+Minecraft is a trademark of Mojang AB. Name used in accordance with my
+interpretation of L<http://www.minecraft.net/terms>, to the best of my
+knowledge.
+
+=back

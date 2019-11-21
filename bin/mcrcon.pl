@@ -14,6 +14,7 @@ my $strip_color = 0;
 my $help = 0;
 my $echo = 0;
 my $force_stdin = 0;
+my $deprecate = 1;
 
 my $result = GetOptions(
     'address=s'     => \$address,
@@ -24,7 +25,11 @@ my $result = GetOptions(
     'stripcolor'    => \$strip_color,
     'help'          => \$help,
     'echo'          => \$echo,
+    'deprecate!'    => \$deprecate,
 );
+
+warn q{This command has been deprecated. Please use mcrcon instead.
+Use --nodeprecate to silence this warning.} if $deprecate;
 
 if ($result and !$help and $password ne ''){
 
@@ -33,6 +38,7 @@ if ($result and !$help and $password ne ''){
             address     => $address,
             port        => $port,
             password    => $password,
+            color_mode  => $strip_color ? 'strip' : 'convert',
         }
     );
 
@@ -40,17 +46,6 @@ if ($result and !$help and $password ne ''){
         die "Failed to connect to RCON!\n";
     }
 
-    # I don't want two commandline options for color handling.
-    # I mean, if you don't want them stripped you probably don't want them raw.
-    # This goes directly to STDOUT anyway, I mean.
-    if ($strip_color){
-        $rcon->strip_color(1);
-    }
-    else {
-        $rcon->strip_color(0);
-        $rcon->convert_color(1);
-    }
-    
     if (@commands){ # --command commandlines
         foreach my $command (@commands){
             send_command($rcon,$command);

@@ -1,3 +1,15 @@
+1.001_01    2019-10-10
+    Minecraft::RCON changes:
+    - Refactor
+    - API changes:
+    mcrcon.pl changes:
+    - mcrcon.pl is now deprecated. Use the much nicer mcrcon instead!
+
+0.1.4
+    - (Historical changelog entry after the fact, on behalf of DEMMY)
+    - Handle auth failures from server
+    - Track request IDs explicitly
+
 0.1.3
 - Improved handling of unexpected or invalid responses
 
