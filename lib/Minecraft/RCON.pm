@@ -11,14 +11,14 @@
 
 package Minecraft::RCON;
 
-our $VERSION = '1.01_02';
+our $VERSION = '1.01_03';
 
 use 5.008;
 use strict;
 use warnings;
 no warnings 'uninitialized';
 
-use Term::ANSIColor  3.02;
+use Term::ANSIColor  3.01;
 use IO::Socket       1.18;  # autoflush
 use Carp;
 
@@ -128,7 +128,7 @@ sub command {
     croak 'Not connected'    unless $s->connected;
 
     my $id = $s->_next_id;
-    my $nonce = 16 + int rand(1 << 15 - 16); # Avoid 0..15
+    my $nonce = 16 + int rand(2 ** 15 - 16); # Avoid 0..15
     $s->_send_encode(COMMAND, $id, $command);
     $s->_send_encode($nonce,  $id, 'nonce');
 

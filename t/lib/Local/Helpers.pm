@@ -13,7 +13,6 @@ use Test::Output;
 use Test::MockModule;
 use Test::Warnings ':all';
 use Carp;
-use Data::Dump qw/pp dd/;
 use List::Util qw/min max any/;
 use IO::Socket 1.18;
 
@@ -41,7 +40,7 @@ sub dep_re() { qr/\Qdeprecated and will be removed in a future release.\E/ }
 my $TRACE = 0;
 sub packet_trace_on()  { $TRACE = 1 }
 sub packet_trace_off() { $TRACE = 0 }
-sub packet_trace(&;$)    { 
+sub packet_trace(&;$)    {
     my $old_TRACE = $TRACE;
     $TRACE = 1;
     diag "Packet trace: $_[1]" if defined $_[1];
@@ -55,7 +54,7 @@ my %default_mock = (
     connected    => sub { $_[0]->{_mock}{connected} },
     send         => \&mock_send,
     recv         => \&mock_recv,
-    recv_buf     => '', 
+    recv_buf     => '',
     _mock_push   => \&_mock_push,
     _disp_find   => \&_disp_find,
     _disp_dump   => \&_disp_dump,
@@ -70,7 +69,7 @@ sub rcon_mock {
     $mocks = { } if not defined $mocks;
 
     my $mock = Test::MockModule->new('IO::Socket::INET');
-    
+
     my $_mock = {
         recv_dispatch   => [ ],
         recv_buf        => '',
@@ -78,8 +77,8 @@ sub rcon_mock {
     };
 
     my %mocks = ( %default_mock,
-                  new => sub { 
-                    shift; bless { @_, _mock => $_mock }, 'IO::Socket::INET'; 
+                  new => sub {
+                    shift; bless { @_, _mock => $_mock }, 'IO::Socket::INET';
                   },
                   %$mocks );
 
@@ -93,7 +92,7 @@ sub rcon_mock {
 sub disp_add {
     my ($_mock, $check, $respond, $priority) = @_;
     $priority = 1 if not defined $priority;
-    push @{$_mock->{recv_dispatch}}, [ $check, $respond ];
+    push @{$_mock->{recv_dispatch}}, [ $check, $respond, $priority ];
 }
 
 # Find an entry in the recv_dispatch
@@ -105,24 +104,24 @@ sub _disp_find {
         my ($check, $resp, $pri) = @$_;
         $pri = 0 if not defined $pri;
         my %info; # Any potential info extracted from check phase
-       
+
         # $check phase. Skip this iteration if not a match
         if ('CODE' eq ref $check) {
             %info = $check->($id, $type, $payload);
             next unless scalar keys %info;
-        } 
+        }
         elsif ('Regexp' eq ref $check) {
             next unless "$id:$type:$payload" =~ /$check/;
             %info = %+;
         }
         elsif ('' eq ref $check) {
             next unless "$id:$type:$payload" eq $check;
-        } else { 
-            croak "Expecting CODE, Regexp or scalar, got " . ref $check 
+        } else {
+            croak "Expecting CODE, Regexp or scalar, got " . ref $check
         }
 
         # $resp can be either an array ref [ $id, $type, $payload ]
-        # or a code ref that takes $id, $type, $payload, %info and 
+        # or a code ref that takes $id, $type, $payload, %info and
         # returns an array ref [ $id, $type, $payload ]
         $r{$pri} = $resp->($id, $type, $payload, %info) if 'CODE' eq ref $resp;
         $r{$pri} = $resp if 'ARRAY' eq ref $resp;
@@ -187,25 +186,25 @@ sub _mock_push {
 }
 
 # Convert a string to printable ASCII
-sub _printable($) { 
-    local $_ = shift; 
+sub _printable($) {
+    local $_ = shift;
 
     s/\0/\\0/g;
-    s/([^ -~])/'\x'.sprintf('%02x', ord($1))/eg; 
-    
-    $_ 
+    s/([^ -~])/'\x'.sprintf('%02x', ord($1))/eg;
+
+    $_
 }
 
 # Mock recv by pulling from the recv_buf created by mock_send.
 # Basic error handling if we are not connected or the buf
-# is empty. (Instead of blocking, we croak()) 
-sub mock_recv { 
+# is empty. (Instead of blocking, we croak())
+sub mock_recv {
     my ($s, undef, $len) = @_;
 
     croak "Not connected" unless $s->connected;
     confess "Buffer not defined" if not exists $s->{_mock}{recv_buf};
     croak "recv() would block" if 0 == length $s->{_mock}{recv_buf};
-    
+
     my $buf  = substr $s->{_mock}{recv_buf}, 0, $len;
     my $rest = substr $s->{_mock}{recv_buf}, $len;
     $s->{_mock}{recv_buf} = $rest;

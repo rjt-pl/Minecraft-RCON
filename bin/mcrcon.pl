@@ -4,7 +4,6 @@ use warnings;
 
 use Minecraft::RCON;
 use Getopt::Long;
-use Data::Dumper;
 
 my @commands;
 my $address = '127.0.0.1';

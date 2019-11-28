@@ -23,7 +23,7 @@ my %WriteMakefileArgs = (
 
     PREREQ_PM           => { 'Carp'             => 0,
                              'IO::Socket'       => 1.18,
-                             'Term::ANSIColor'  => 3.02 },
+                             'Term::ANSIColor'  => 3.01 },
 
     META_MERGE          => {
         resources => {
