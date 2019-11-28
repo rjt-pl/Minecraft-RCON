@@ -11,7 +11,7 @@
 
 package Minecraft::RCON;
 
-our $VERSION = '1.010_01';
+our $VERSION = '1.01_02';
 
 use 5.008;
 use strict;

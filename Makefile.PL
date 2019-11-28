@@ -15,10 +15,11 @@ my %WriteMakefileArgs = (
     EXE_FILES           => [ qw< bin/mcrcon.pl bin/mcrcon > ],
 
     MIN_PERL_VERSION    => 5.008,
-    TEST_REQUIRES       => { 'Test::Exception'  => 0,
-                             'Test::More'       => 0,
-                             'Test::Output'     => 0,
-                             'Test::Warnings'   => 0.02,},
+    TEST_REQUIRES       => { 'Test::Exception'  => 0.43,
+                             'List::Util'       => 1.33,
+                             'Test::More'       => 1.30,
+                             'Test::Output'     => 1.03,
+                             'Test::Warnings'   => 0.026,},
 
     PREREQ_PM           => { 'Carp'             => 0,
                              'IO::Socket'       => 1.18,

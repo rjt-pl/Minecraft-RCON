@@ -1,4 +1,10 @@
-1.001_01    2019-10-10
+1.01_02     2019-11-27
+    - Tighter dependency version controls
+    - Nonce math order of operations was broken on older Perls due to
+      undefined behavior with << operator. Serendipitiously only affected
+      testing, and only on older Perls.
+
+1.01_01     2019-11-21
     Minecraft::RCON changes:
     - Refactor
     - API changes:

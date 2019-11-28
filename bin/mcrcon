@@ -13,7 +13,7 @@ use Getopt::Long;
 use Pod::Usage;
 use Term::ANSIColor;
 
-our $VERSION = '1.010_01';
+our $VERSION = '1.01_02';
 
 my %o = get_options();
 my %PERMITTED = map { $_ => 1 } qw< address port password >;
