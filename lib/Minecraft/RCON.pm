@@ -255,7 +255,7 @@ sub _recv_decode {
         $frags++;
     }
 
-    croak 'Packet too short. ' . length . ' < 10' if 10 > length;
+    croak 'Packet too short. ' . length($_) . ' < 10' if 10 > length($_);
     croak "Received packet missing terminator" unless s/\0\0$//;
 
     $size, unpack 'V!V(A*)';
