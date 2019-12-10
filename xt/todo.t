@@ -2,7 +2,6 @@
 
 use 5.008;
 use Test::More;
-use File::Find;
 use strict;
 
 eval "use Test::Fixme";
