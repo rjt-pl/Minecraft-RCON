@@ -1,12 +1,12 @@
-1.00  2019-12-10
-    - Minecraft::RCON changes:
-      - Refactor
-      - API changes:
-    - mcrcon.pl changes:
-      - mcrcon.pl is now deprecated. Use the much nicer mcrcon instead!
+1.00  2019-12-10 RJT
+    - Fragmentation: Server responses larger than ~4KiB are now supported.
+    - convert_color(), strip_color() along with their counterparts in the
+      constructor are now deprecated and may be removed in a future version.
+      Use color_mode() instead.
+    - address(), port(), and password() are now deprecated and may
+      be removed in a future version
 
-0.1.4
-    - (Historical changelog entry after the fact, on behalf of DEMMY)
+0.1.4   2013-01-30 DEMMY
     - Handle auth failures from server
     - Track request IDs explicitly
 
