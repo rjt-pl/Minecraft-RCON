@@ -1,3 +1,7 @@
+1.01  2019-12-11 RJT
+    - No changes to module code. Two tests were failing on some older systems
+      due to scoping issues with Test::MockModule and IO::Socket.
+
 1.00  2019-12-10 RJT
     - Fragmentation: Server responses larger than ~4KiB are now supported.
     - convert_color(), strip_color() along with their counterparts in the
@@ -6,7 +10,7 @@
     - address(), port(), and password() are now deprecated and may
       be removed in a future version
 
-0.1.4   2013-01-30 DEMMY
+0.1.4 2013-01-30 DEMMY
     - Handle auth failures from server
     - Track request IDs explicitly
 

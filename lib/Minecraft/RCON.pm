@@ -11,7 +11,7 @@
 
 package Minecraft::RCON;
 
-our $VERSION = '1.00';
+our $VERSION = '1.01';
 
 use 5.010;
 use strict;
@@ -271,7 +271,7 @@ Minecraft::RCON - RCON remote console communication with Minecraft servers
 
 =head1 VERSION
 
-Version 1.00
+Version 1.01
 
 =head1 SYNOPSIS
 
