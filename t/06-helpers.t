@@ -31,15 +31,17 @@ use Minecraft::RCON;
 
     disp_add($_mock, '4:2:help' => sub { [4, RESPONSE_VALUE, "Your help"] });
     disp_add($_mock, qr/^\d+:\d+:nonce$/, => sub {
-        my ($id, $type, $payload, %p) = @_; 
+        my ($id, $type, $payload, %p) = @_;
         [ $id, RESPONSE_VALUE, sprintf("Unknown request %x", $type) ]
     });
-    
+
     #packet_trace { $rcon->command('help') } 'help command';
     $rcon->command('help');
 
-    is $rcon->_next_id, 5, 
+    is $rcon->_next_id, 5,
         'next_id increments on command but not on nonce';
+
+    $rcon->disconnect; # Test::MockModule
 }
 
 done_testing;

@@ -22,7 +22,10 @@ sub cmd($@) {
     });
     ok $rcon->connect, 'Connects before ' . $cmd;
 
-    eval { $rcon->command($cmd); };
+    my $r = eval { $rcon->command($cmd); };
+    $rcon->disconnect;
+
+    $r;
 }
 
 # Make random junk of specified length
@@ -40,6 +43,7 @@ for (qw/80 1024 4095 4096 4097 10240/) {
 {
     my $rcon = Minecraft::RCON->new({password => 'secret'});
     throws_ok { $rcon->command('foo') } qr/Not connected/;
+    $rcon->disconnect;
 }
 
 done_testing;
