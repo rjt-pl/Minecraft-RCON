@@ -30,7 +30,7 @@ my %WriteMakefileArgs = (
     META_MERGE          => {
         resources => {
             'meta-spec' => { version => 2 },
-            repository  => 'https://github.com/rjt-pl/Minecraft::RCON.git',
+            repository  => 'https://github.com/rjt-pl/Minecraft-RCON.git',
         },
     },
     dist      => { COMPRESS => 'gzip -9f', SUFFIX => 'gz',           },
