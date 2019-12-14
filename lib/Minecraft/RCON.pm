@@ -123,7 +123,6 @@ sub disconnect {
 sub command {
     my ($s, $command, $mode) = @_;
 
-    # Return undef explicitly here because 0 might be a legit command result
     croak 'Command required' unless length $command;
     croak 'Not connected'    unless $s->connected;
 
