@@ -11,7 +11,7 @@
 
 package Minecraft::RCON;
 
-our $VERSION = '1.01';
+our $VERSION = '1.02';
 
 use 5.010;
 use strict;
@@ -482,6 +482,8 @@ B<Deprecated.> Use C<color_mode('strip')> instead.
 =head1 SEE ALSO
 
 =over 4
+
+=item L<Net::RCON::Minecraft> for an alternative API
 
 =item L<Terminal::ANSIColor>, L<IO::Socket::INET>
 

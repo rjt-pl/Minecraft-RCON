@@ -31,6 +31,7 @@ my %WriteMakefileArgs = (
         resources => {
             'meta-spec' => { version => 2 },
             repository  => 'https://github.com/rjt-pl/Minecraft-RCON.git',
+            bugtracker  => 'https://github.com/rjt-pl/Text-Trim/issues',
         },
     },
     dist      => { COMPRESS => 'gzip -9f', SUFFIX => 'gz',           },

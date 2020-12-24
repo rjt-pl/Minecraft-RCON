@@ -1,3 +1,8 @@
+1.02  2020-12-24 RJT
+    - No changes to module code
+    - RT -> GitHub for issue tracking
+    - Documentation tweaks
+
 1.01  2019-12-11 RJT
     - No changes to module code. Two tests were failing on some older systems
       due to scoping issues with Test::MockModule and IO::Socket.

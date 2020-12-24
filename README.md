@@ -1,6 +1,6 @@
 # About Minecraft::RCON
 
-`Net::RCON::Minecraft` is a Minecraft-specific implementation of the RCON
+`Minecraft::RCON` is a Minecraft-specific implementation of the RCON
 protocol, used to automate sending commands and receiving responses from a
 Minecraft server.
 
@@ -52,7 +52,7 @@ work. For example, Windows users will probably want to use `gmake` instead of
 
 # Support
 
- - [RT, CPAN's request tracker](https://rt.cpan.org/NoAuth/Bugs.html?Queue=Minecraft::RCON): Please report bugs here.
+ - [Issue Tracker](https://github.com/rjt-pl/Text-Trim/issues): Bug reports and feature requests
  - [GitHub Repository](https://github.com/rjt-pl/Minecraft-RCON)
 
 # Authors
