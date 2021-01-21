@@ -11,7 +11,7 @@
 
 package Minecraft::RCON;
 
-our $VERSION = '1.02';
+our $VERSION = '1.03';
 
 use 5.010;
 use strict;
@@ -270,7 +270,7 @@ Minecraft::RCON - RCON remote console communication with Minecraft servers
 
 =head1 VERSION
 
-Version 1.01
+Version 1.03
 
 =head1 SYNOPSIS
 
@@ -478,6 +478,16 @@ If C<$enable> is a true value, change the color mode to C<strip>.
 Returns 1 if the current color mode is C<strip>, undef otherwise.
 
 B<Deprecated.> Use C<color_mode('strip')> instead.
+
+=head1 SUPPORT
+
+=over 4
+
+=item L<https://github.com/rjt-pl/Minecraft-RCON.git>: Source code repository
+
+=item L<https://github.com/rjt-pl/Minecraft-RCON/issues>: Bug reports and feature requests
+
+=back
 
 =head1 SEE ALSO
 

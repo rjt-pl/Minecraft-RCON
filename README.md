@@ -52,7 +52,7 @@ work. For example, Windows users will probably want to use `gmake` instead of
 
 # Support
 
- - [Issue Tracker](https://github.com/rjt-pl/Text-Trim/issues): Bug reports and feature requests
+ - [Issue Tracker](https://github.com/rjt-pl/Minecraft-RCON/issues): Bug reports and feature requests
  - [GitHub Repository](https://github.com/rjt-pl/Minecraft-RCON)
 
 # Authors
